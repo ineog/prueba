@@ -57,6 +57,7 @@ def visualize_proposals(proposals_info, point_color=(255, 0, 0), point_radius=1)
 
 
 def draw_probmap(x):
+    #print("Maximo:", np.max(x), "Minimo:", np.min(x))
     return cv2.applyColorMap((x * 255).astype(np.uint8), cv2.COLORMAP_HOT)
 
 
@@ -105,8 +106,8 @@ def get_boundaries(instances_masks, boundaries_width=1):
         obj_boundary = np.logical_xor(obj_mask, np.logical_and(inner_mask, obj_mask))
         boundaries = np.logical_or(boundaries, obj_boundary)
     return boundaries
-    
- 
+
+
 def draw_with_blend_and_clicks(img, mask=None, alpha=0.6, clicks_list=None, pos_color=(0, 255, 0),
                                neg_color=(255, 0, 0), radius=4):
     result = img.copy()
@@ -140,5 +141,3 @@ def add_tag(image, tag = 'nodefined', tag_h = 40):
     cv2.putText(tag_blanc,tag,(10,30),cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0 ), 1)
     image = cv2.vconcat([image,tag_blanc])
     return image
-
-

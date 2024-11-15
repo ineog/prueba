@@ -75,7 +75,7 @@ def parse_args():
 
     parser.add_argument('--target-crop-r', type=float, default=1.40,
                                   help='Target Crop Expand Ratio')
-    
+
     parser.add_argument('--focus-crop-r', type=float, default=1.40,
                                   help='Focus Crop Expand Ratio')
 
@@ -156,13 +156,13 @@ def main():
                                       #zoom_in_params=None)
                                       zoom_in_params=zoomin_params)
 
-            #vis_callback = get_prediction_vis_callback(logs_path, dataset_name, args.thresh) if args.vis else None
+            vis_callback = get_prediction_vis_callback(logs_path, dataset_name, args.thresh) if args.vis else None
             dataset_results = evaluate_func(dataset, predictor, pred_thr=args.thresh,
                                                max_iou_thr=args.target_iou,
                                                min_clicks=args.min_n_clicks,
                                                max_clicks=args.n_clicks,
                                                vis=args.vis,
-                                               )
+                                               callback=vis_callback)
             if args.local_rank == 0:
                 row_name = args.mode if single_model_eval else checkpoint_path.stem
                 if args.iou_analysis:
@@ -176,7 +176,7 @@ def main():
                             print_header=print_header)
                 print_header = False
             synchronize()
-            
+
 
 
 def get_predictor_and_zoomin_params(args, dataset_name):
@@ -321,12 +321,19 @@ def save_iou_analysis_data(args, dataset_name, logs_path, logs_prefix, dataset_r
 def get_prediction_vis_callback(logs_path, dataset_name, prob_thresh):
     save_path = logs_path / 'predictions_vis' / dataset_name
     save_path.mkdir(parents=True, exist_ok=True)
+    print("save_path:",dataset_name)
 
     def callback(image, gt_mask, pred_probs, sample_id, click_indx, clicks_list):
+        print(f"Guardando imagen para sample_id: {sample_id}, click_indx: {click_indx}")
         sample_path = save_path / f'{sample_id}_{click_indx}.jpg'
+        path = save_path / 'matrices' / f'{sample_id}_{click_indx}.txt'
         prob_map = draw_probmap(pred_probs)
+        #print("maximo:",max(pred_probs),"minimo:",min(pred_probs))
         image_with_mask = draw_with_blend_and_clicks(image, pred_probs > prob_thresh, clicks_list=clicks_list)
         cv2.imwrite(str(sample_path), np.concatenate((image_with_mask, prob_map), axis=1)[:, :, ::-1])
+        #cv2.imwrite(str(sample_path), prob_map[:, :, ::-1])
+        np.savetxt(path, pred_probs)
+
 
     return callback
 

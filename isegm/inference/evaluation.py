@@ -10,6 +10,8 @@ import cv2
 from isegm.utils.distributed import get_rank, synchronize, get_world_size, all_gather
 import itertools
 
+#from scripts.evaluate_model import get_prediction_vis_callback
+
 try:
     get_ipython()
     from tqdm import tqdm_notebook as tqdm
@@ -17,6 +19,7 @@ except NameError:
     from tqdm import tqdm
 
 def evaluate_dataset_dist(dataset, predictor, vis = True, vis_path = './experiments/vis_val/',**kwargs):
+    #from scripts.evaluate_model import get_prediction_vis_callback
     all_ious = []
     rank, world_size = get_rank(), get_world_size()
     if vis:
@@ -26,6 +29,7 @@ def evaluate_dataset_dist(dataset, predictor, vis = True, vis_path = './experime
             if os.path.exists(save_dir):
                 shutil.rmtree(save_dir)
             os.makedirs(save_dir)
+            #callback = get_prediction_vis_callback(save_dir, dataset.name, prob_thresh=0.5)
     else:
         save_dir = None
     start_time = time()
@@ -33,6 +37,7 @@ def evaluate_dataset_dist(dataset, predictor, vis = True, vis_path = './experime
         pbar = tqdm(total=len(dataset), unit='image')
     for index in range(rank, len(dataset), world_size):
         sample = dataset.get_sample(index)
+
         _, sample_ious, _ = evaluate_sample(sample.image, sample.gt_mask, sample.init_mask, predictor,
                                             sample_id=index, vis= vis, save_dir = save_dir,
                                             index = index, **kwargs)
@@ -41,7 +46,7 @@ def evaluate_dataset_dist(dataset, predictor, vis = True, vis_path = './experime
             for _ in range(world_size):
                 pbar.update(1)
                 pbar.set_description(f'Test {index+world_size}')
-    
+
     synchronize()
     if rank == 0:
         pbar.close()
@@ -52,6 +57,7 @@ def evaluate_dataset_dist(dataset, predictor, vis = True, vis_path = './experime
     return all_ious, elapsed_time
 
 def evaluate_dataset(dataset, predictor, vis = True, vis_path = './experiments/vis_val/',**kwargs):
+#    from scripts.evaluate_model import get_prediction_vis_callback
     all_ious = []
     if vis:
         save_dir =  vis_path + dataset.name + '/'
@@ -59,6 +65,7 @@ def evaluate_dataset(dataset, predictor, vis = True, vis_path = './experiments/v
         if os.path.exists(save_dir):
             shutil.rmtree(save_dir)
         os.makedirs(save_dir)
+        #callback = get_prediction_vis_callback(save_dir, dataset.name, prob_thresh=0.5)
     else:
         save_dir = None
 
@@ -85,12 +92,14 @@ def Progressive_Merge(pred_mask, previous_mask, y, x):
         progressive_mask = np.logical_or( previous_mask, corr_mask)
     return progressive_mask
 
+#vis_callback = get_prediction_vis_callback(logs_path, dataset_name, prob_thresh=0.5)
 
 def evaluate_sample(image, gt_mask, init_mask, predictor, max_iou_thr,
                     pred_thr=0.49, min_clicks=1, max_clicks=20,
                     sample_id=None, vis = True, save_dir = None, index = 0,  callback=None,
                     progressive_mode = True,
                     ):
+
     clicker = Clicker(gt_mask=gt_mask)
     pred_mask = np.zeros_like(gt_mask)
     prev_mask = pred_mask
@@ -105,7 +114,7 @@ def evaluate_sample(image, gt_mask, init_mask, predictor, max_iou_thr,
             num_pm = 0
         else:
             num_pm = 999
-        
+
         pred_masks = []
         for click_indx in range(max_clicks):
             vis_pred = prev_mask
@@ -115,7 +124,7 @@ def evaluate_sample(image, gt_mask, init_mask, predictor, max_iou_thr,
 
             if progressive_mode:
                 clicks = clicker.get_clicks()
-                if len(clicks) >= num_pm: 
+                if len(clicks) >= num_pm:
                     last_click = clicks[-1]
                     last_y, last_x = last_click.coords[0], last_click.coords[1]
                     pred_mask = Progressive_Merge(pred_mask, prev_mask,last_y, last_x)
@@ -128,5 +137,5 @@ def evaluate_sample(image, gt_mask, init_mask, predictor, max_iou_thr,
             prev_mask = pred_mask
             if iou >= max_iou_thr and click_indx + 1 >= min_clicks:
                 break
-        
+
         return clicker.clicks_list, np.array(ious_list, dtype=np.float32), pred_probs
